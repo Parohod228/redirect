@@ -3,233 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirect Manager</title>
+    <title>Gist-Controlled Redirect</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: transparent;
+            background-color: #fff; /* Білий фон */
             font-family: Arial, sans-serif;
-        }
-
-        .spinner-container {
-            display: flex;
+            margin: 0;
+            padding: 0;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
         }
 
         .spinner {
+            /* ЗБІЛЬШЕНИЙ РОЗМІР */
             width: 80px;
             height: 80px;
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #4285f4;
+            border: 8px solid #f3f3f3; /* Світло-сірий фон спінера */
+            border-top: 8px solid #4285f4; /* Голубий колір! */
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-bottom: 15px;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        .manage-container {
-            display: none;
-            max-width: 400px;
-            width: 100%;
-            padding: 20px;
-        }
-
-        .manage-container.active {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-            color: #5f6368;
-        }
-
-        input[type="url"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: #4285f4;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #357ae8;
-        }
-
-        .btn-secondary {
-            background: #f1f3f4;
-            color: #5f6368;
-        }
-
-        .btn-secondary:hover {
-            background: #e8eaed;
-        }
-
-        .current-url {
-            background: #f1f3f4;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 12px;
-            color: #5f6368;
-            word-break: break-all;
+        
+        .message {
+            display: none; /* Текстові повідомлення приховані */
         }
     </style>
 </head>
 <body>
-    <div class="spinner-container" id="spinnerContainer">
-        <div class="spinner"></div>
-    </div>
 
-    <div class="manage-container" id="manageContainer">
-        <h2 style="margin-bottom: 20px; color: #202124;">Redirect Manager</h2>
-        
-        <div class="current-url" id="currentUrlDisplay" style="display: none;">
-            <strong id="currentUrl"></strong>
-        </div>
-
-        <div class="form-group">
-            <label for="redirectUrl">URL:</label>
-            <input 
-                type="url" 
-                id="redirectUrl" 
-                placeholder="https://example.com"
-                autocomplete="off"
-            >
-        </div>
-
-        <div class="button-group">
-            <button class="btn-primary" onclick="saveAndRedirect()">Зберегти</button>
-            <button class="btn-secondary" onclick="clearUrl()">Очистити</button>
-        </div>
-    </div>
+    <div class="spinner"></div> 
+    <div class="message"></div> 
 
     <script>
-        const STORAGE_KEY = 'redirectUrl';
+        // *** ВАШІ ПРЯМІ ПОСИЛАННЯ ***
+        const BASE_CONFIG_URL = 'https://gist.githubusercontent.com/Parohod228/4795bf4e7d99a23fd778b7b51e9e80b9/raw/config.json';
+        const GIST_EDIT_URL = 'https://gist.github.com/Parohod228/4795bf4e7d99a23fd778b7b51e9e80b9'; 
+        // ***************************
 
-        function syncWithTampermonkey(url) {
-            window.dispatchEvent(new CustomEvent('redirectUrlUpdate', {
-                detail: { url: url }
-            }));
-            console.log('[Redirect] Synced with Tampermonkey:', url);
-        }
+        const LOG_PREFIX = '[Gist Redirector]';
 
-        const savedUrl = localStorage.getItem(STORAGE_KEY);
-        if (savedUrl) {
-            syncWithTampermonkey(savedUrl);
-            console.log('[Redirect] Sent saved URL to Tampermonkey immediately:', savedUrl);
-        }
 
-        function displayCurrentUrl() {
-            const display = document.getElementById('currentUrlDisplay');
-            const urlText = document.getElementById('currentUrl');
+        // Асинхронна функція для завантаження конфігурації з Gist
+        async function fetchConfigFromGist() {
+            // Додаємо cache-buster
+            const CACHE_BUSTED_URL = BASE_CONFIG_URL + '?' + Date.now();
             
-            if (savedUrl) {
-                display.style.display = 'block';
-                urlText.textContent = savedUrl;
-                console.log('[Redirect] Current saved URL:', savedUrl);
-            } else {
-                display.style.display = 'none';
-                console.log('[Redirect] No URL saved');
-            }
-        }
-
-        function saveAndRedirect() {
-            const input = document.getElementById('redirectUrl');
-            const url = input.value.trim();
-            
-            if (url) {
-                try {
-                    new URL(url);
-                    localStorage.setItem(STORAGE_KEY, url);
-                    syncWithTampermonkey(url);
-                    console.log('[Redirect] URL saved:', url);
-                } catch (e) {
-                    console.error('[Redirect] Invalid URL:', url);
-                    return;
+            try {
+                const response = await fetch(CACHE_BUSTED_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            } else {
-                localStorage.removeItem(STORAGE_KEY);
-                syncWithTampermonkey(null);
-                console.log('[Redirect] URL removed');
+                const config = await response.json();
+                return config;
+            } catch (error) {
+                console.error(LOG_PREFIX, 'Failed to fetch config. Defaulting to Google.', error);
+                return { redirect_url: 'https://google.com', is_enabled: false }; 
             }
-            
-            performRedirect();
         }
 
-        function clearUrl() {
-            localStorage.removeItem(STORAGE_KEY);
-            document.getElementById('redirectUrl').value = '';
-            syncWithTampermonkey(null);
-            displayCurrentUrl();
-            console.log('[Redirect] URL cleared');
+        // Головна функція редиректу
+        async function executeRedirect() {
+            const config = await fetchConfigFromGist();
+            let finalTargetUrl;
+
+            // 1. Визначення цільового URL
+            if (config.is_enabled === true) {
+                finalTargetUrl = config.redirect_url;
+            } else {
+                finalTargetUrl = 'https://google.com';
+            }
+
+            // 2. Виконання редиректу
+            if (finalTargetUrl && finalTargetUrl !== window.location.href) {
+                // Спінер залишається видимим
+                window.location.replace(finalTargetUrl); 
+            } else {
+                // Якщо помилка або циклічний URL, ховаємо спінер (дія завершена)
+                document.querySelector('.spinner').style.display = 'none';
+                console.error(LOG_PREFIX, 'Final redirect target is invalid or self-referencing. Stopping.');
+            }
         }
 
-        function performRedirect() {
-            const redirectUrl = savedUrl || 'https://google.com';
-            
-            console.log('[Redirect] Redirecting to:', redirectUrl);
-            
-            document.getElementById('manageContainer').classList.remove('active');
-            document.getElementById('spinnerContainer').style.display = 'flex';
-            
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 300);  
-        }
 
         window.addEventListener('load', () => {
-            displayCurrentUrl();
-            
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('manage')) {
-                document.getElementById('spinnerContainer').style.display = 'none';
-                document.getElementById('manageContainer').classList.add('active');
-                console.log('[Redirect] Management mode active');
-                return;
-            }
-            
-            setTimeout(() => {
-                if (savedUrl || !urlParams.has('manage')) {
-                    performRedirect();
-                }
-            }, 200);
+             // Виконуємо редирект, коли DOM завантажено
+             executeRedirect();
         });
     </script>
 </body>
