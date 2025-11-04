@@ -65,7 +65,8 @@
                 return config;
             } catch (error) {
                 console.error(LOG_PREFIX, 'Failed to fetch config. Defaulting to Google.', error);
-                return { redirect_url: 'https://google.com', is_enabled: false }; 
+                // Повертаємо redirect_url_site для використання за замовчуванням
+                return { redirect_url_site: 'https://google.com', is_enabled: false }; 
             }
         }
 
@@ -76,7 +77,8 @@
 
             // 1. Визначення цільового URL
             if (config.is_enabled === true) {
-                finalTargetUrl = config.redirect_url;
+                // *** ВИКОРИСТОВУЄМО ПЕРЕМІННУ: redirect_url_site ***
+                finalTargetUrl = config.redirect_url_site;
             } else {
                 finalTargetUrl = 'https://google.com';
             }
